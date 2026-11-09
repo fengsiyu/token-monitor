@@ -1,0 +1,109 @@
+name: Build Linux
+
+# Manual-only Linux packaging for forks and local release experiments.
+# release.yml runs on `v*` tags and gates its release job on a macOS leg that
+# needs Developer ID secrets, so a fork without those secrets can build the
+# Linux AppImages but never collects them into a Release. This workflow builds
+# both Linux architectures on native arm64/x64 runners and uploads the
+# artifacts directly, with no signing secrets required.
+#
+# The two legs each produce their own single-arch latest-linux.yml; the bundle
+# job merges them into one architecture-aware feed (the same shape
+# release.yml publishes) so the output can be dropped into a Release as-is.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+            dist_script: dist:linux
+            artifact_name: token-monitor-linux-x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            dist_script: dist:linux:arm64
+            artifact_name: token-monitor-linux-arm64
+    runs-on: ${{ matrix.os }}
+    # AppImage packaging downloads the Electron framework plus the pinned
+    # tokscale binary; bound the run instead of waiting for the 6h default.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Platform evidence
+        run: node -p "process.platform + '-' + process.arch"
+      - run: npm ci
+      # Resolves the current host's vendored tokscale asset, so the arm64
+      # runner gets the linux-arm64 build and the x64 runner the linux-x64 one.
+      - name: Ensure vendored tokscale (DSH bridge)
+        run: node scripts/ensure-vendored-tokscale.js
+      - name: Verify vendored tokscale (DSH bridge)
+        run: node scripts/verify-vendored-tokscale.js
+      # APPIMAGE_EXTRACT_AND_RUN lets electron-builder's bundled appimagetool
+      # run without libfuse2 (absent on the runners).
+      - name: Build Linux AppImage
+        run: npm run ${{ matrix.dist_script }}
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+      - name: Verify updater artifact names
+        run: npm run verify:release-artifact-names
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          path: |
+            dist/*.AppImage
+            dist/latest-linux.yml
+            dist/*.blockmap
+
+  bundle:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          pattern: token-monitor-linux-*
+      - name: Stage artifacts and merge linux updater metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p linux-dist
+          # Both legs ship a file called latest-linux.yml, so collect everything
+          # else first and let the merge script own that single filename.
+          while IFS= read -r -d '' file; do
+            name=$(basename "$file")
+            if [ "$name" = "latest-linux.yml" ]; then
+              continue
+            fi
+            if [ -e "linux-dist/$name" ]; then
+              echo "duplicate release artifact: $name" >&2
+              exit 1
+            fi
+            cp "$file" "linux-dist/$name"
+          done < <(find artifacts -mindepth 2 -type f -print0)
+          node scripts/merge-linux-updater-metadata.js \
+            linux-dist/latest-linux.yml \
+            artifacts/token-monitor-linux-x64/latest-linux.yml \
+            artifacts/token-monitor-linux-arm64/latest-linux.yml
+          node scripts/verify-updater-artifact-names.js linux-dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: token-monitor-linux-all-arch
+          if-no-files-found: error
+          path: linux-dist
