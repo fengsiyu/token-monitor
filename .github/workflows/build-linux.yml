@@ -53,7 +53,23 @@ jobs:
       # APPIMAGE_EXTRACT_AND_RUN lets electron-builder's bundled appimagetool
       # run without libfuse2 (absent on the runners).
       - name: Build Linux AppImage
-        run: npm run ${{ matrix.dist_script }}
+        shell: bash
+        run: |
+          # The Electron/framework download occasionally returns 504 from the
+          # GitHub release gateway. Retry with backoff instead of failing the
+          # whole run on a transient gateway error.
+          for attempt in 1 2 3; do
+            if npm run "${{ matrix.dist_script }}"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Build failed after 3 attempts" >&2
+              exit 1
+            fi
+            wait_seconds=$((attempt * 20))
+            echo "Build attempt $attempt failed; retrying in ${wait_seconds}s" >&2
+            sleep "$wait_seconds"
+          done
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
       - name: Verify updater artifact names
