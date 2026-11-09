@@ -76,7 +76,9 @@ test('linux arm64 feed uses the arch-suffixed latest-linux-arm64.yml', () => {
   );
   assert.match(buildLinux, /dist\/latest-linux\*\.yml/);
   assert.match(buildLinux, /\[\[ "\$name" == latest-linux\*\.yml \]\]/);
-  assert.match(buildLinux, /artifacts\/token-monitor-linux-arm64\/latest-linux-arm64\.yml/);
+  // Feeds are located by name so a flat or nested download layout both work.
+  assert.match(buildLinux, /find artifacts -type f -name 'latest-linux-arm64\.yml' -path '\*linux-arm64\*'/);
+  assert.match(buildLinux, /merge-linux-updater-metadata\.js[\s\\]+linux-dist\/latest-linux\.yml "\$x64_feed" "\$arm64_feed"/);
   assert.doesNotMatch(buildLinux, /token-monitor-linux-arm64\/latest-linux\.yml/);
 
   const release = fs.readFileSync(
