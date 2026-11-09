@@ -19,14 +19,42 @@ const {
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 60 * 1000;
+const MAX_DOWNLOAD_ATTEMPTS = 4;
+const RETRY_BASE_DELAY_MS = 1000;
+// Gateway/rate-limit statuses that clear on their own within seconds. A 404 or
+// other deterministic response must still fail immediately rather than burn
+// attempts.
+const RETRYABLE_HTTP_STATUS = new Set([429, 500, 502, 503, 504]);
 
-async function downloadAsset(manifest, entry, fetchImpl = fetch) {
-  const url = `https://github.com/${manifest.releaseRepo}/releases/download/${manifest.releaseTag}/${entry.asset}`;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(attempt, random = Math.random) {
+  // Exponential backoff with full jitter: 1s, 2s, 4s base.
+  return Math.floor(random() * RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+}
+
+function isTransientNetworkError(error) {
+  if (error && error.retryable === true) return true;
+  if (!error) return false;
+  if (error.name === 'AbortError') return true;
+  // Node's fetch surfaces connection resets and DNS blips as "fetch failed".
+  return error.name === 'TypeError' &&
+    /fetch failed|ECONNRESET|ETIMEDOUT|EAI_AGAIN|network|timeout/i.test(error.message);
+}
+
+async function downloadOnce(url, fetchImpl) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   try {
     const response = await fetchImpl(url, { signal: controller.signal, redirect: 'follow' });
-    if (!response.ok) throw new Error(`Download failed: ${response.status} ${url}`);
+    if (!response.ok) {
+      const error = new Error(`Download failed: ${response.status} ${url}`);
+      error.status = response.status;
+      error.retryable = RETRYABLE_HTTP_STATUS.has(response.status);
+      throw error;
+    }
     const contentLength = Number(response.headers.get('content-length') || 0);
     if (contentLength > MAX_BYTES) throw new Error(`Asset too large: ${contentLength} bytes`);
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -35,6 +63,26 @@ async function downloadAsset(manifest, entry, fetchImpl = fetch) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function downloadAsset(manifest, entry, fetchImpl = fetch, options = {}) {
+  const {
+    attempts = MAX_DOWNLOAD_ATTEMPTS,
+    sleepImpl = sleep,
+    random = Math.random
+  } = options;
+  const url = `https://github.com/${manifest.releaseRepo}/releases/download/${manifest.releaseTag}/${entry.asset}`;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await downloadOnce(url, fetchImpl);
+    } catch (error) {
+      lastError = error;
+      if (!isTransientNetworkError(error) || attempt === attempts) throw error;
+      await sleepImpl(retryDelayMs(attempt, random));
+    }
+  }
+  throw lastError;
 }
 
 function sha256(buffer) {
@@ -188,11 +236,16 @@ if (require.main === module) {
 module.exports = {
   MAX_BYTES,
   DOWNLOAD_TIMEOUT_MS,
+  MAX_DOWNLOAD_ATTEMPTS,
+  RETRYABLE_HTTP_STATUS,
   downloadAsset,
   ensureVendoredTokscale,
+  isTransientNetworkError,
   main,
+  retryDelayMs,
   sha256,
   sha256File,
+  sleep,
   smokeTest,
   verifySha256
 };

@@ -6,7 +6,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { ensureVendoredTokscale } = require('../../scripts/ensure-vendored-tokscale');
+const {
+  downloadAsset,
+  ensureVendoredTokscale,
+  retryDelayMs
+} = require('../../scripts/ensure-vendored-tokscale');
 const { manifestMode } = require('../../scripts/vendoredTokscale');
 
 test('manifestMode defaults to override and only "upstream" flips it', () => {
@@ -301,4 +305,97 @@ test('mode absent behaves exactly like mode "override" (backward compatible)', a
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+function okResponse(payload) {
+  const body = Buffer.from(payload);
+  return {
+    ok: true,
+    headers: { get: (name) => (name === 'content-length' ? String(body.length) : null) },
+    arrayBuffer: async () => body
+  };
+}
+
+function errorResponse(status) {
+  return { ok: false, status };
+}
+
+function sequenceFetch(responses) {
+  let calls = 0;
+  const urls = [];
+  return {
+    calls: () => calls,
+    urls,
+    fetch: async (url) => {
+      urls.push(url);
+      const response = responses[calls];
+      calls += 1;
+      if (response instanceof Error) throw response;
+      return response;
+    }
+  };
+}
+
+const downloadManifest = { releaseRepo: 'Javis603/tokscale', releaseTag: 'token-monitor-test' };
+const downloadEntry = { asset: 'tokscale-linux-x64' };
+
+test('downloadAsset retries a 504 gateway and returns the body once it succeeds', async () => {
+  const seq = sequenceFetch([errorResponse(504), errorResponse(504), okResponse('binary')]);
+  const sleeps = [];
+  const result = await downloadAsset(downloadManifest, downloadEntry, seq.fetch, {
+    sleepImpl: async (ms) => sleeps.push(ms),
+    random: () => 0
+  });
+  assert.deepEqual(result, Buffer.from('binary'));
+  assert.equal(seq.calls(), 3);
+  assert.equal(sleeps.length, 2);
+  assert.ok(seq.urls.every((url) => url.endsWith('/tokscale-linux-x64')));
+});
+
+test('downloadAsset gives up after exhausting attempts on a persistent 504', async () => {
+  const seq = sequenceFetch([errorResponse(504), errorResponse(504), errorResponse(504), errorResponse(504)]);
+  const sleeps = [];
+  await assert.rejects(
+    downloadAsset(downloadManifest, downloadEntry, seq.fetch, {
+      sleepImpl: async (ms) => sleeps.push(ms),
+      random: () => 0
+    }),
+    /Download failed: 504/
+  );
+  assert.equal(seq.calls(), 4);
+  assert.equal(sleeps.length, 3);
+});
+
+test('downloadAsset fails immediately on a non-retryable 404', async () => {
+  const seq = sequenceFetch([errorResponse(404)]);
+  const sleeps = [];
+  await assert.rejects(
+    downloadAsset(downloadManifest, downloadEntry, seq.fetch, {
+      sleepImpl: async (ms) => sleeps.push(ms)
+    }),
+    /Download failed: 404/
+  );
+  assert.equal(seq.calls(), 1);
+  assert.equal(sleeps.length, 0);
+});
+
+test('downloadAsset retries a transient network abort and then succeeds', async () => {
+  const abort = new Error('The operation was aborted');
+  abort.name = 'AbortError';
+  const seq = sequenceFetch([abort, okResponse('binary')]);
+  const sleeps = [];
+  const result = await downloadAsset(downloadManifest, downloadEntry, seq.fetch, {
+    sleepImpl: async (ms) => sleeps.push(ms),
+    random: () => 0
+  });
+  assert.deepEqual(result, Buffer.from('binary'));
+  assert.equal(seq.calls(), 2);
+  assert.equal(sleeps.length, 1);
+});
+
+test('retryDelayMs applies exponential backoff with jitter', () => {
+  assert.equal(retryDelayMs(1, () => 1), 1000);
+  assert.equal(retryDelayMs(2, () => 1), 2000);
+  assert.equal(retryDelayMs(3, () => 1), 4000);
+  assert.equal(retryDelayMs(1, () => 0), 0);
 });
