@@ -4,6 +4,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { artifactNameFromReference } = require('./verify-updater-artifact-names');
 
+// electron-builder's getArtifactArchName writes AppImage names with the Linux
+// toolchain arch token, not the internal Arch enum: x64 becomes x86_64 while
+// arm64 stays arm64. Map the logical arch to the marker that actually appears
+// in the artifact name so the assertions match the real files.
+const APP_IMAGE_ARCH_MARKERS = {
+  x64: 'x86_64',
+  arm64: 'arm64'
+};
+
 // The Linux AppImage feed is built on two separate runners (one x64, one
 // arm64), so each produces a single-arch latest-linux.yml. This mirrors
 // merge-mac-updater-metadata.js: parse both feeds, prove each references only
@@ -67,10 +76,14 @@ function parseLinuxUpdaterMetadata(contents, label = 'metadata') {
 
 function assertLinuxArchitecture(metadata, arch) {
   // Each runner ships exactly one AppImage, and its name carries the arch.
+  const archMarker = APP_IMAGE_ARCH_MARKERS[arch];
+  if (archMarker === undefined) {
+    throw new Error(`${metadata.label} uses unsupported architecture ${arch}`);
+  }
   if (metadata.fileNames.length !== 1) {
     throw new Error(`${metadata.label} must reference exactly one AppImage, got ${metadata.fileNames.length}`);
   }
-  const expected = `-${arch}.`;
+  const expected = `-${archMarker}.`;
   const [fileName] = metadata.fileNames;
   if (!fileName.endsWith('.AppImage')) {
     throw new Error(`${metadata.label} references ${fileName}, expected an AppImage`);

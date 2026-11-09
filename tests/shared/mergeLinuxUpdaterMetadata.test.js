@@ -15,15 +15,20 @@ const {
   parseLinuxUpdaterMetadata
 } = require('../../scripts/merge-linux-updater-metadata');
 
+// Mirrors electron-builder's getArtifactArchName for AppImage: the x64 file
+// carries the x86_64 marker while arm64 stays arm64.
+const APP_IMAGE_ARCH_MARKERS = { x64: 'x86_64', arm64: 'arm64' };
+
 function linuxUpdaterMetadata(version, arch) {
+  const marker = APP_IMAGE_ARCH_MARKERS[arch];
   return [
     `version: ${version}`,
     'files:',
-    `  - url: Token-Monitor-${version}-${arch}.AppImage`,
+    `  - url: Token-Monitor-${version}-${marker}.AppImage`,
     `    sha512: ${arch}-hash==`,
     `    size: ${arch === 'arm64' ? '200' : '100'}`,
     `    blockMapSize: ${arch === 'arm64' ? '20' : '10'}`,
-    `path: Token-Monitor-${version}-${arch}.AppImage`,
+    `path: Token-Monitor-${version}-${marker}.AppImage`,
     `sha512: ${arch}-hash==`,
     "releaseDate: '2026-11-09T00:00:00.000Z'",
     ''
@@ -31,7 +36,8 @@ function linuxUpdaterMetadata(version, arch) {
 }
 
 // Mirrors electron-updater Provider.findFile(): prefer the artifact whose
-// name contains the running arch, falling back to the first entry.
+// name contains the running arch, falling back to the first entry. On x64 the
+// file is named x86_64, so it resolves via the first-entry fallback.
 function selectForArch(names, arch) {
   return names.find((name) => name.includes(arch)) ?? names[0];
 }
@@ -44,17 +50,17 @@ test('merges x64 and arm64 linux feeds into one architecture-aware feed', () => 
   );
 
   assert.deepEqual(referencedArtifactNames(merged), [
-    `Token-Monitor-${version}-x64.AppImage`,
+    `Token-Monitor-${version}-x86_64.AppImage`,
     `Token-Monitor-${version}-arm64.AppImage`
   ]);
 
   // x64 is the base, so the legacy top-level path/sha512 stay on the x64 file.
-  assert.match(merged, new RegExp(`^path: Token-Monitor-${version}-x64\\.AppImage$`, 'm'));
+  assert.match(merged, new RegExp(`^path: Token-Monitor-${version}-x86_64\\.AppImage$`, 'm'));
   assert.match(merged, /^sha512: x64-hash==$/m);
   assert.equal((merged.match(/^path:/gm) || []).length, 1);
 
   // Both file blocks keep their full per-entry metadata.
-  assert.match(merged, /Token-Monitor-0\.88\.0-x64\.AppImage[\s\S]*?size: 100[\s\S]*?blockMapSize: 10/);
+  assert.match(merged, /Token-Monitor-0\.88\.0-x86_64\.AppImage[\s\S]*?size: 100[\s\S]*?blockMapSize: 10/);
   assert.match(merged, /Token-Monitor-0\.88\.0-arm64\.AppImage[\s\S]*?size: 200[\s\S]*?blockMapSize: 20/);
 });
 
@@ -66,7 +72,7 @@ test('merged feed resolves the correct AppImage for each architecture', () => {
   );
   const names = referencedArtifactNames(merged);
 
-  assert.equal(selectForArch(names, 'x64'), `Token-Monitor-${version}-x64.AppImage`);
+  assert.equal(selectForArch(names, 'x64'), `Token-Monitor-${version}-x86_64.AppImage`);
   assert.equal(selectForArch(names, 'arm64'), `Token-Monitor-${version}-arm64.AppImage`);
 });
 
@@ -85,7 +91,7 @@ test('rejects mismatched or mislabelled linux metadata', () => {
     ),
     /versions differ/
   );
-  // An x64-labelled feed that actually points at an arm64 artifact fails closed.
+  // An arm64-only feed handed to the x64 check fails closed.
   assert.throws(
     () => mergeLinuxUpdaterMetadata(
       linuxUpdaterMetadata('0.88.0', 'arm64'),
@@ -102,11 +108,11 @@ test('rejects malformed file lists and stale top-level paths', () => {
   const twoEntries = [
     `version: ${version}`,
     'files:',
-    `  - url: Token-Monitor-${version}-x64.AppImage`,
+    `  - url: Token-Monitor-${version}-x86_64.AppImage`,
     '    sha512: a==',
     `  - url: Token-Monitor-${version}-other.AppImage`,
     '    sha512: b==',
-    `path: Token-Monitor-${version}-x64.AppImage`,
+    `path: Token-Monitor-${version}-x86_64.AppImage`,
     'sha512: a=='
   ].join('\n');
   assert.throws(
@@ -114,10 +120,11 @@ test('rejects malformed file lists and stale top-level paths', () => {
     /x64 metadata must reference exactly one AppImage/
   );
 
-  // path not present in the files list.
+  // path not present in the files list (the x86_64 marker is kept so the
+  // arch check passes and the path-membership check is the one that fires).
   const badPath = linuxUpdaterMetadata(version, 'x64').replace(
-    `path: Token-Monitor-${version}-x64.AppImage`,
-    `path: Other-Monitor-${version}-x64.AppImage`
+    `path: Token-Monitor-${version}-x86_64.AppImage`,
+    `path: Other-Monitor-${version}-x86_64.AppImage`
   );
   assert.throws(
     () => mergeLinuxUpdaterMetadata(badPath, linuxUpdaterMetadata(version, 'arm64')),
@@ -162,7 +169,7 @@ test('mergeLinuxUpdaterMetadataFiles writes the merged feed to disk', (t) => {
   assert.equal(mergeLinuxUpdaterMetadataFiles(outputPath, x64Path, arm64Path), outputPath);
   assert.ok(fs.existsSync(outputPath));
   assert.deepEqual(referencedArtifactNames(fs.readFileSync(outputPath, 'utf8')), [
-    'Token-Monitor-0.88.0-x64.AppImage',
+    'Token-Monitor-0.88.0-x86_64.AppImage',
     'Token-Monitor-0.88.0-arm64.AppImage'
   ]);
 });
