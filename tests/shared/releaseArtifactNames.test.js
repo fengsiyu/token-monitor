@@ -67,6 +67,28 @@ test('linux packaging builds one architecture per leg', () => {
   assert.doesNotMatch(rootPackage.scripts['dist:linux:arm64'], /--x64/);
 });
 
+test('linux arm64 feed uses the arch-suffixed latest-linux-arm64.yml', () => {
+  // electron-builder writes latest-linux.yml for x64 but latest-linux-arm64.yml
+  // for the arm64 leg, so the workflows must reference the real per-arch name.
+  const buildLinux = fs.readFileSync(
+    path.join(__dirname, '..', '..', '.github', 'workflows', 'build-linux.yml'),
+    'utf8'
+  );
+  assert.match(buildLinux, /dist\/latest-linux\*\.yml/);
+  assert.match(buildLinux, /\[\[ "\$name" == latest-linux\*\.yml \]\]/);
+  assert.match(buildLinux, /artifacts\/token-monitor-linux-arm64\/latest-linux-arm64\.yml/);
+  assert.doesNotMatch(buildLinux, /token-monitor-linux-arm64\/latest-linux\.yml/);
+
+  const release = fs.readFileSync(
+    path.join(__dirname, '..', '..', '.github', 'workflows', 'release.yml'),
+    'utf8'
+  );
+  assert.match(release, /dist\/latest-linux-arm64\.yml/);
+  assert.match(release, /! -name 'latest-linux\*\.yml'/);
+  assert.match(release, /artifacts\/token-monitor-linux-arm64\/latest-linux-arm64\.yml/);
+  assert.doesNotMatch(release, /token-monitor-linux-arm64\/latest-linux\.yml/);
+});
+
 test('release body template carries every localized release-note section', () => {
   const releaseTemplate = fs.readFileSync(
     path.join(__dirname, '..', '..', '.github', 'RELEASE_TEMPLATE.md'),

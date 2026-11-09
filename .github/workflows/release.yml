@@ -57,7 +57,7 @@ jobs:
             artifact_name: token-monitor-linux-arm64
             artifact_path: |
               dist/*.AppImage
-              dist/latest-linux.yml
+              dist/latest-linux-arm64.yml
               dist/*.blockmap
     runs-on: ${{ matrix.os }}
     permissions:
@@ -362,7 +362,7 @@ jobs:
               exit 1
             fi
             cp "$file" "release-artifacts/$name"
-          done < <(find artifacts -mindepth 2 -type f ! -name 'latest-mac.yml' ! -name 'latest-linux.yml' -print0)
+          done < <(find artifacts -mindepth 2 -type f ! -name 'latest-mac.yml' ! -name 'latest-linux*.yml' -print0)
           node scripts/merge-mac-updater-metadata.js \
             release-artifacts/latest-mac.yml \
             artifacts/token-monitor-mac-arm64/latest-mac.yml \
@@ -370,7 +370,7 @@ jobs:
           node scripts/merge-linux-updater-metadata.js \
             release-artifacts/latest-linux.yml \
             artifacts/token-monitor-linux-x64/latest-linux.yml \
-            artifacts/token-monitor-linux-arm64/latest-linux.yml
+            artifacts/token-monitor-linux-arm64/latest-linux-arm64.yml
           node scripts/verify-updater-artifact-names.js release-artifacts
       - name: Add generated changelog details to release notes
         env:

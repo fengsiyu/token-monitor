@@ -85,7 +85,7 @@ jobs:
           if-no-files-found: error
           path: |
             dist/*.AppImage
-            dist/latest-linux.yml
+            dist/latest-linux*.yml
             dist/*.blockmap
 
   bundle:
@@ -105,11 +105,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p linux-dist
-          # Both legs ship a file called latest-linux.yml, so collect everything
-          # else first and let the merge script own that single filename.
+          # The legs ship different feed filenames: x64 writes latest-linux.yml
+          # and arm64 writes latest-linux-arm64.yml. Collect the binaries first
+          # and let the merge script own the single output latest-linux.yml.
           while IFS= read -r -d '' file; do
             name=$(basename "$file")
-            if [ "$name" = "latest-linux.yml" ]; then
+            if [[ "$name" == latest-linux*.yml ]]; then
               continue
             fi
             if [ -e "linux-dist/$name" ]; then
@@ -121,7 +122,7 @@ jobs:
           node scripts/merge-linux-updater-metadata.js \
             linux-dist/latest-linux.yml \
             artifacts/token-monitor-linux-x64/latest-linux.yml \
-            artifacts/token-monitor-linux-arm64/latest-linux.yml
+            artifacts/token-monitor-linux-arm64/latest-linux-arm64.yml
           node scripts/verify-updater-artifact-names.js linux-dist
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
