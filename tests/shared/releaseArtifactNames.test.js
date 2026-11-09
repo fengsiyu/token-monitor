@@ -56,6 +56,17 @@ test('release artifact templates use GitHub-safe names', () => {
   for (const pattern of patterns) assert.doesNotMatch(pattern, /\s/);
 });
 
+test('linux packaging builds one architecture per leg', () => {
+  // electron-builder's target arch wins over --x64/--arm64: pinning both here
+  // makes every leg emit both AppImages, which collide when the release
+  // artifacts are staged together.
+  assert.deepEqual(rootPackage.build.linux.target, ['AppImage']);
+  assert.match(rootPackage.scripts['dist:linux'], /--x64/);
+  assert.doesNotMatch(rootPackage.scripts['dist:linux'], /--arm64/);
+  assert.match(rootPackage.scripts['dist:linux:arm64'], /--arm64/);
+  assert.doesNotMatch(rootPackage.scripts['dist:linux:arm64'], /--x64/);
+});
+
 test('release body template carries every localized release-note section', () => {
   const releaseTemplate = fs.readFileSync(
     path.join(__dirname, '..', '..', '.github', 'RELEASE_TEMPLATE.md'),
