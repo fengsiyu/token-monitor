@@ -15,7 +15,7 @@
     <a href="https://github.com/Javis603/token-monitor/releases"><img src="https://img.shields.io/github/downloads/Javis603/token-monitor/total?style=flat-square&color=22c55e" alt="총 다운로드" /></a>
     <img src="https://img.shields.io/badge/Windows-10%2B-0078D4?style=flat-square" alt="Windows 10 이상" />
     <img src="https://img.shields.io/badge/macOS-13%2B-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS 13 or later" />
-    <img src="https://img.shields.io/badge/Linux-x64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64" />
+    <img src="https://img.shields.io/badge/Linux-x64%2F%2Farm64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64 and arm64" />
     <a href="https://discord.gg/HmdNVVvw5P"><img src="https://img.shields.io/discord/1344259784219689031?color=5865F2&label=Discord&logo=discord&logoColor=white&style=flat-square" alt="Discord"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-A855F7?style=flat-square" alt="라이선스: MIT" /></a>
 </p>
@@ -333,6 +333,7 @@ brew install --cask token-monitor
 - **macOS (Intel)** — x64 `.dmg`, 서명 및 notarize 완료
 - **Windows 10/11** — 설치용 및 휴대용 `.exe`, [서명됨](docs/code-signing.md)
 - **Linux x64** — `.AppImage`
+- **Linux arm64** — `.AppImage`, Ubuntu 24.04 이상
 
 패키지 빌드는 GitHub Releases를 자동 확인합니다. 새 버전이 있으면 화면에 업데이트 표시가 나타나며, 지원되는 플랫폼에서는 설정 → 일반에서도 설치할 수 있습니다.
 
@@ -412,7 +413,8 @@ npm install
 npm run dist:mac     # macOS arm64 .dmg           → dist/
 npm run dist:mac:x64 # macOS Intel x64 .dmg       → dist/
 npm run dist:win     # Windows x64 installer .exe → dist/
-npm run dist:linux   # Linux x64 AppImage         → dist/
+npm run dist:linux       # Linux x64 AppImage         → dist/
+npm run dist:linux:arm64 # Linux arm64 AppImage       → dist/ (Ubuntu 24.04 이상)
 npm run pack         # 설치 없이 앱 디렉터리만 (로컬 테스트)
 ```
 

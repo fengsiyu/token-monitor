@@ -31,6 +31,7 @@
     "dist:win:dir": "npm run ensure:tokscale -- --platform=win32-x64 && electron-builder --win dir --x64 --publish never",
     "dist:win:prepackaged": "electron-builder --prepackaged dist/win-unpacked --win nsis portable --x64 --publish never",
     "dist:linux": "npm run ensure:tokscale -- --platform=linux-x64 && electron-builder --config scripts/electron-builder.config.js --linux --x64 --publish never",
+    "dist:linux:arm64": "npm run ensure:tokscale -- --platform=linux-arm64 && electron-builder --config scripts/electron-builder.config.js --linux --arm64 --publish never",
     "verify:release-artifact-names": "node scripts/verify-updater-artifact-names.js dist",
     "benchmark:hub-bandwidth": "node scripts/benchmark-hub-bandwidth.js",
     "lint": "eslint .",
@@ -103,12 +104,13 @@
       }
     },
     "linux": {
-      "artifactName": "Token-Monitor-${version}.${ext}",
+      "artifactName": "Token-Monitor-${version}-${arch}.${ext}",
       "target": [
         {
           "target": "AppImage",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         }
       ],

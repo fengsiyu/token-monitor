@@ -15,7 +15,7 @@
     <a href="https://github.com/Javis603/token-monitor/releases"><img src="https://img.shields.io/github/downloads/Javis603/token-monitor/total?style=flat-square&color=22c55e" alt="Total downloads" /></a>
     <img src="https://img.shields.io/badge/Windows-10%2B-0078D4?style=flat-square" alt="Windows 10 or later" />
     <img src="https://img.shields.io/badge/macOS-13%2B-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS 13 or later" />
-    <img src="https://img.shields.io/badge/Linux-x64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64" />
+    <img src="https://img.shields.io/badge/Linux-x64%2F%2Farm64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64 and arm64" />
     <a href="https://discord.gg/HmdNVVvw5P"><img src="https://img.shields.io/discord/1344259784219689031?color=5865F2&label=Discord&logo=discord&logoColor=white&style=flat-square" alt="Discord"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-A855F7?style=flat-square" alt="License: MIT" /></a>
 </p>
@@ -328,6 +328,7 @@ Or download from [GitHub Releases](https://github.com/Javis603/token-monitor/rel
 - **macOS (Intel)** — x64 `.dmg`, signed and notarized
 - **Windows 10/11** — setup and portable `.exe`, [code-signed](docs/code-signing.md)
 - **Linux x64** — `.AppImage`
+- **Linux arm64** — `.AppImage`, Ubuntu 24.04 or later
 
 Packaged builds check GitHub Releases automatically. When an update is available, the app shows an update indicator; supported platforms can also install from Settings → General.
 
@@ -407,7 +408,8 @@ npm install
 npm run dist:mac     # macOS arm64 .dmg           → dist/
 npm run dist:mac:x64 # macOS Intel x64 .dmg       → dist/
 npm run dist:win     # Windows x64 installer .exe → dist/
-npm run dist:linux   # Linux x64 AppImage         → dist/
+npm run dist:linux       # Linux x64 AppImage         → dist/
+npm run dist:linux:arm64 # Linux arm64 AppImage       → dist/ (Ubuntu 24.04+)
 npm run pack         # unpacked app dir (no installer), for quick local testing
 ```
 

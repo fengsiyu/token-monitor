@@ -15,7 +15,7 @@
     <a href="https://github.com/Javis603/token-monitor/releases"><img src="https://img.shields.io/github/downloads/Javis603/token-monitor/total?style=flat-square&color=22c55e" alt="总下载量" /></a>
     <img src="https://img.shields.io/badge/Windows-10%2B-0078D4?style=flat-square" alt="Windows 10 或更新" />
     <img src="https://img.shields.io/badge/macOS-13%2B-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS 13 或更新" />
-    <img src="https://img.shields.io/badge/Linux-x64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64" />
+    <img src="https://img.shields.io/badge/Linux-x64%2F%2Farm64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64 与 arm64" />
     <a href="https://discord.gg/HmdNVVvw5P"><img src="https://img.shields.io/discord/1344259784219689031?color=5865F2&label=Discord&logo=discord&logoColor=white&style=flat-square" alt="Discord"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-A855F7?style=flat-square" alt="许可证：MIT" /></a>
 </p>
@@ -333,6 +333,7 @@ brew install --cask token-monitor
 - **macOS（Intel）** — x64 `.dmg`，已签名并 notarize
 - **Windows 10/11** — 安装版和便携版 `.exe`，均[已签名](docs/code-signing.md)
 - **Linux x64** — `.AppImage`
+- **Linux arm64** — `.AppImage`，需 Ubuntu 24.04 或更新版本
 
 打包版会自动检查 GitHub Releases。有新版本时，界面会显示更新提示；受支持的平台也可在 设置 → 常规 中安装更新。
 
@@ -412,7 +413,8 @@ npm install
 npm run dist:mac     # macOS arm64 .dmg → dist/
 npm run dist:mac:x64 # macOS Intel x64 .dmg → dist/
 npm run dist:win     # Windows x64 安装包 .exe → dist/
-npm run dist:linux   # Linux x64 AppImage → dist/
+npm run dist:linux       # Linux x64 AppImage → dist/
+npm run dist:linux:arm64 # Linux arm64 AppImage → dist/（Ubuntu 24.04+）
 npm run pack         # 未打包的 app 目录（无安装包），方便本机快速测试
 ```
 
